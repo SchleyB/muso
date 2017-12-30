@@ -7,6 +7,7 @@ export default class App extends React.Component {
     super(props);
     this.recordingSettings = JSON.parse(JSON.stringify(Audio.RECORDING_OPTIONS_PRESET_LOW_QUALITY));
     this.recording = null;
+    this.sound = null;
     this.state = {
       haveRecordingPermissions: false,
     };
@@ -21,7 +22,18 @@ export default class App extends React.Component {
     })();
   }
 
-  async _record() {
+  _record = async () => {
+    console.log('record');
+    console.log('have Permissions? ', this.state);
+
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+    });
+
     const recording = new Audio.Recording();
 
     try {
@@ -29,20 +41,45 @@ export default class App extends React.Component {
 
       this.recording = recording;
 
-      await recording.startAsync(); // Will call this._updateScreenForRecordingStatus to update the screen.
+      await recording.startAsync();
     } catch(e) {
       console.log('error: ', e);
     }
   }
 
-  async _stopRecord() {
+  _stopRecord = async () => {
+    console.log('stop record');
     try {
       await this.recording.stopAndUnloadAsync();
     } catch (error) {
-      // Do nothing -- we are already unloaded.
+      console.log('stop error: ', error);
     }
-     // const info = await FileSystem.getInfoAsync(this.recording.getURI());
-    // console.log(`FILE INFO: ${JSON.stringify(info)}`);
+
+    const info = await FileSystem.getInfoAsync(this.recording.getURI());
+    console.log(`FILE INFO: ${JSON.stringify(info)}`);
+
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+      playsInSilentModeIOS: true,
+      playsInSilentLockedModeIOS: true,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+    });
+
+    const { sound, status } = await this.recording.createNewLoadedSound(
+      {
+        isLooping: true,
+      },
+    );
+
+    this.sound = sound;
+  }
+
+  _play = () => {
+    if (this.sound != null) {
+      this.sound.playAsync();
+    }
   }
 
   render() {
@@ -56,6 +93,10 @@ export default class App extends React.Component {
         <Button
           title="Stop"
           onPress={this._stopRecord}
+        />
+        <Button
+          title="Play Sound"
+          onPress={this._play}
         />
       </View>
     );
